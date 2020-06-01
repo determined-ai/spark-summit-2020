@@ -1,0 +1,24 @@
+batches_per_step: 5
+data:
+  bucket: david-voc-delta
+  train:
+    table: train
+    version: 1
+  val:
+    table: val
+    version: 1
+description: training
+entrypoint: model_def:ObjectDetectionModel
+hyperparameters:
+  global_batch_size: 32
+  learning_rate: 0.018
+  momentum: 0.809
+  weight_decay: 0.0005
+min_validation_period: 25
+resources:
+  slots_per_trial: 8
+searcher:
+  max_steps: 250
+  metric: 'mAP'
+  name: single
+  smaller_is_better: false
