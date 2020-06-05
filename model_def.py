@@ -1,4 +1,5 @@
 import copy
+import os
 from typing import Any, Dict, Sequence, Union
 
 import torch
@@ -6,13 +7,13 @@ import torchvision
 from torch import nn
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 import determined as det
 from determined.pytorch import DataLoader, LRScheduler, PyTorchTrial
+from determined.experimental import Determined
 
-from data import VOCParquetDataset, download_version, collate_fn
+from data import VOCDeltaDataset, download_version, collate_fn
 from utils import get_batch_statistics, ap_per_class
 
 TorchData = Union[Dict[str, torch.Tensor], Sequence[torch.Tensor], torch.Tensor]
@@ -24,10 +25,13 @@ class ObjectDetectionModel(PyTorchTrial):
         self.current_step = context.env.first_step()
 
         self.download_directory = f"/tmp/data-rank{self.context.distributed.get_rank()}/"
-        self.download_data()
-        self.train_dataset = VOCParquetDataset(self.train_data_path)
-        self.val_dataset = VOCParquetDataset(self.val_data_path)
-        self.num_classes = self.train_dataset.NUM_CLASSES
+        if "INFERENCE" in os.environ and os.environ["INFERENCE"] == "True":
+            self.num_classes = 20
+        else:
+            self.download_data()
+            self.train_dataset = VOCDeltaDataset(self.train_data_path)
+            self.val_dataset = VOCDeltaDataset(self.val_data_path)
+            self.num_classes = self.train_dataset.NUM_CLASSES
 
     def download_data(self):
         data_config = self.context.get_data_config()
@@ -60,6 +64,12 @@ class ObjectDetectionModel(PyTorchTrial):
         # only two "classes": pedestrian and background.
         in_features = model.roi_heads.box_predictor.cls_score.in_features
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.num_classes)
+        load_exp = self.context.get_hparam("load_from_experiment")
+        if load_exp > 0:
+            os.environ["INFERENCE"] = "True"
+            pretrained = Determined().get_experiment(load_exp).top_checkpoint().load(path=self.download_directory)
+            os.environ["INFERENCE"] = "False"
+            model.load_state_dict(pretrained.state_dict())
         return model
 
     def optimizer(self, model: nn.Module) -> torch.optim.Optimizer:
@@ -72,7 +82,8 @@ class ObjectDetectionModel(PyTorchTrial):
         return optimizer
 
     def create_lr_scheduler(self, optimizer):
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[8, 12], gamma=0.1)
+        # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
         return LRScheduler(lr_scheduler, step_mode=LRScheduler.StepMode.STEP_EVERY_EPOCH)
 
     def train_batch(

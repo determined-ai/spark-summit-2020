@@ -6,14 +6,14 @@ data:
     version: 0
   val:
     table: val
-    version: 1
+    version: 0
 description: training
 entrypoint: model_def:ObjectDetectionModel
 hyperparameters:
   global_batch_size: 4
   learning_rate:
     base: 10
-    maxval: -1.5
+    maxval: -2
     minval: -4
     type: log
   momentum:
@@ -23,7 +23,7 @@ hyperparameters:
   weight_decay: 0.0005
 min_validation_period: 10
 resources:
-  slots_per_trial: 4
+  slots_per_trial: 1
 searcher:
   max_steps: 1000
   max_trials: 32

@@ -6,8 +6,12 @@ from typing import Any, Dict, Tuple
 
 import boto3
 import json
+import numpy as np
 import torch
 import torchvision
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from torchvision.transforms.functional import to_pil_image
 from torchvision.transforms import Compose, ToTensor
 
 from PIL import Image
@@ -45,13 +49,14 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-class VOCParquetDataset(Dataset):
+class VOCDeltaDataset(Dataset):
     def __init__(self,
                  root,
                  transforms=get_transform()):
         self.transforms = transforms
         dataset = pq.ParquetDataset(root)
         self.table = dataset.read()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.class_names = [
             "aeroplane",
@@ -105,14 +110,12 @@ class VOCParquetDataset(Dataset):
             bbox = [float(bb["xmin"]), float(bb["ymin"]), float(bb["xmax"]), float(bb["ymax"])]
             boxes.append(bbox)
 
-        device = torch.device('cuda')
-
-        boxes = torch.as_tensor(boxes, dtype=torch.float32).to(device)
-        labels = torch.as_tensor(labels, dtype=torch.int64).to(device)
+        boxes = torch.as_tensor(boxes, dtype=torch.float32).to(self.device)
+        labels = torch.as_tensor(labels, dtype=torch.int64).to(self.device)
         if self.transforms is not None:
             img = self.transforms(img)
 
-        return img.to(device), {'labels': labels, 'boxes': boxes}
+        return img.to(self.device), {'labels': labels, 'boxes': boxes}
 
     def __len__(self):
         return self.table.num_rows
@@ -137,6 +140,28 @@ class VOCParquetDataset(Dataset):
             if not children:
                 voc_dict[node.tag] = text
         return voc_dict
+
+    def get(self, n):
+        return self.table.slice(0,n).to_pandas()
+
+    def draw_histogram(self):
+        counts = {c: 0 for c in self.class_names}
+        annotations = self.table.column('annotations').to_pandas()
+        for index, annotation in annotations.items():
+            anno_dict = self.parse_voc_xml(ET.fromstring(annotation))
+            for obj in anno_dict['annotation']['object']:
+                name = obj['name']
+                counts[name] += 1
+
+        names = list(counts.keys())
+        values = list(counts.values())
+        plt.rcParams['figure.figsize'] = [13, 6]
+        plt.bar(names, values)
+        plt.xticks(rotation='vertical', fontsize=18)
+        plt.yticks(fontsize=18)
+        plt.show()
+
+
 
 
 def download_s3_dir(bucket_name, directory, download_dir):
@@ -177,3 +202,22 @@ def download_version(table_path, bucket, version=0, save_path='./'):
                 if 'remove' in info:
                     files.remove(info['remove']['path'])
     return download_parquet(bucket, table_path, files, save_path)
+
+
+def draw_example(image, labels, title=None):
+    fig,ax = plt.subplots(1)
+    image = to_pil_image(image)
+    plt.title(title)
+    ax.imshow(image)
+    boxes = labels['boxes'].numpy()
+    boxes = np.vsplit(boxes, boxes.shape[0])
+    for box in boxes:
+        box = np.squeeze(box)
+        bottom, left = box[0], box[1]
+        width = box[2] - box[0]
+        height = box[3] - box[1]
+        rect = patches.Rectangle((bottom,left),width,height,linewidth=2,edgecolor='r',facecolor='none')
+        # # Add the patch to the Axes
+        ax.add_patch(rect)
+    plt.axis('off')
+    plt.show()

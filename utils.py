@@ -5,6 +5,7 @@ Minor updates made to work with this code base
 
 import numpy as np
 import torchvision
+from matplotlib import pyplot as plt
 
 def get_batch_statistics(outputs, targets, iou_threshold=0.5):
     """ Compute true positives, predicted scores and predicted labels per sample """
@@ -127,3 +128,31 @@ def compute_ap(recall, precision):
     # and sum (\Delta recall) * prec
     ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
     return ap
+
+
+def show_hp_comparison():
+    hyperband = .5272
+    old_hps = .3806
+
+    names = ['"Recommended" Hyperparameters', 'With Adaptive Search']
+    values = [old_hps, hyperband]
+
+    plt.bar(names, values, width=0.6)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.ylabel('Mean Average Preciscion', fontsize=18)
+    plt.show()
+
+
+def show_dog_comparison():
+    v1 = .481
+    v2 = .664
+
+    names = ['Dataset V0', 'Dataset V1']
+    values = [v1, v2]
+
+    plt.bar(names, values, width=0.6)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.ylabel('Mean Average Preciscion (dog)', fontsize=18)
+    plt.show()
