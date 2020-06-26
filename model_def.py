@@ -58,7 +58,7 @@ class ObjectDetectionModel(PyTorchTrial):
         )
 
     def build_model(self) -> nn.Module:
-        model = fasterrcnn_resnet50_fpn(pretrained=False)
+        model = fasterrcnn_resnet50_fpn(pretrained=False, pretrained_backbone=False)
 
         # Replace the classifier with a new two-class classifier.  There are
         # only two "classes": pedestrian and background.

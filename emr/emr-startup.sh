@@ -15,4 +15,4 @@ sudo pip3 install -U \
     determined==0.12.4 \
     pyarrow==0.14.1
 
-sudo aws s3 cp s3://david-emr-startup/delta-core_2.11-0.6.0.jar /usr/lib/spark/jars/
+sudo aws s3 cp s3://<YOUR STARTUP BUCKET>/delta-core_2.11-0.6.0.jar /usr/lib/spark/jars/

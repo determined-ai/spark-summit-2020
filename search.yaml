@@ -21,6 +21,7 @@ hyperparameters:
     minval: 0.7
     type: double
   weight_decay: 0.0005
+  load_from_experiment: -1
 min_validation_period: 10
 resources:
   slots_per_trial: 1
